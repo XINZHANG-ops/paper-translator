@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+    $(document).ready(function() {
+        var tooltip;  // 定义在这里，以便可以在 mouseleave 事件中访问
+
+        // 对每个 PDF 链接添加 mouseover 事件
+        $('#pdf-list a').mouseover(function(e) {
+            var filename = $(this).text();  // 获取 PDF 文件名
+            var url = '/api/notes_first_nonempty/' + filename;  // 构建 API URL
+            $.get(url, function(data) {  // 发送 GET 请求到 API
+                var note = data.note;  // 从返回的 JSON 数据中获取笔记
+                if (note) {  // 如果笔记不为空
+                    // 创建一个浮动框并添加到页面上
+                    tooltip = $('<div>').text(note).css({
+                        position: 'absolute',
+                        left: e.pageX + 10,
+                        top: e.pageY + 10,
+                        border: '1px solid black',
+                        padding: '5px',
+                        background: 'white',
+                    });
+                    $('body').append(tooltip);
+                }
+            });
+        });
+
+        // 当鼠标离开链接时，删除浮动框
+        $('#pdf-list a').mouseleave(function() {
+            if (tooltip) tooltip.remove();
+        });
+    });
+    </script>
+    <style>
+    .margin-right {
+        margin-right: 20px;
+    }
+    </style>
+
+</head>
+<body>
+    <h1>PDF List</h1>
+    <div>
+        <a href="/upload" class="margin-right">Upload a new PDF file</a>
+        <a href="/download_all">Download all files</a>
+    </div>
+    <ul id="pdf-list">
+        {% for file in pdf_files %}
+        <li>
+            <!-- [D]按钮，用于删除PDF文件 -->
+            <form action="/delete/{{ file }}" method="post" style="display: inline;">
+                <button type="submit">Del</button>
+            </form>
+            <!-- [A]按钮，用于删除PDF文件的分析结果 -->
+            <form action="/delete_analysis/{{ file }}" method="post" style="display: inline;">
+                <button type="submit">Clear</button>
+            </form>
+            <a href="/view/{{ file }}">{{ file }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

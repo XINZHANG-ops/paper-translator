@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/static/styles.css">
+    <meta charset="UTF-8">
+    <title>View PDF</title>
+    <style>
+    #chunks div {
+      font-size: 18px;  /* 调整字体大小 */
+      font-weight: bold;  /* 调整字体粗细 */
+    }
+
+    #main-content {
+        display: flex;  /* 使用flex布局 */
+        height: 80%;  /* 设置主要内容的高度 */
+        position: relative; /* 用于定位页码 */
+    }
+
+    #the-canvas {
+        border: 1px solid black;
+        flex-grow: 0;  /* 允许canvas元素在有剩余空间时增大 */
+    }
+
+    #page_num {
+        position: absolute;
+        left: 0;
+        top: 0;
+        background: rgba(255, 255, 255, 0.7); /* 背景色，增加透明度以使底层可见 */
+        padding: 10px;
+        border-bottom-right-radius: 5px;
+    }
+
+    #chunks {
+        width: 50%;
+        max-height: 80vh;
+        overflow: auto;
+        border-left: 1px solid black;
+        padding-top: 1%;    /* 设置上边距 */
+        padding-right: 1%;  /* 设置右边距 */
+        padding-bottom: 1%; /* 设置下边距 */
+        padding-left: 2%;   /* 设置左边距 */
+    }
+    </style>
+</head>
+<body style="background-color: {{ 'white' if theme == 'white' else 'black' if theme == 'dark' else 'grey' }}; color: {{ 'black' if theme == 'white' else 'yellow' if theme == 'dark' else 'white' }};">
+    <div>
+        <p class="medium-font">{{ filename }}</p>
+        <p class="small-font">Total Usage: {{ total_usage }}</p>
+        <select id="theme-selector" class="form-select">
+          <option value="white">White</option>
+          <option value="dark">Dark</option>
+          <option value="grey">Grey</option>
+        </select>
+    </div>
+    <a href="/download_chunks/{{ filename }}">[D]</a>
+    <button id="prev"><</button>
+    <button id="next">></button>
+    <button id="get-analysis">GPTAnalysis</button>
+    <button id="get-from-local">FromLocal</button>
+    <button id="stop-task">StopTask</button>
+    <input type="file" id="file-input" style="display: none;">
+    <progress id="progress-bar" value="0" max="100"></progress>
+    <div id="main-content">
+        <div id="page_num"></div>
+        <canvas id="the-canvas"></canvas>
+        <div id="chunks"></div>
+    </div>
+    <div id="note-section">
+        <textarea id="note-textarea" onwheel="handleScroll(event)" oninput="autoSaveNote()"></textarea>
+    </div>
+    <script src="https://mozilla.github.io/pdf.js/build/pdf.js"></script>
+    <script src="/static/view_pdf.js"></script>
+    <script>
+        initPDFViewer("/uploads/{{ filename }}");
+    </script>
+    <script>
+        window.filename = "{{ filename }}";  // 从服务器端传递文件名到客户端
+    </script>
+    <script>
+    $("#get-analysis").click(function() {
+        $.post("/api/generate_chunks/" + window.filename, function(data) {
+            // 在这里处理服务器返回的数据
+            // 假设服务器返回的数据是一个 JSON 对象，包含 'chunks' 和 'total_usage' 两个字段
+            $("#chunks").empty();  // 清空原有的 chunks
+            for (var i = 0; i < data.chunks.length; i++) {
+                $("#chunks").append("<div>" + data.chunks[i] + "</div>");
+            }
+            // 更新 total_usage
+            $(".small-font").text("Total Usage: " + data.total_usage);
+        });
+    });
+    $("#get-from-local").click(function() {
+        // 用户点击 "Get from local" 按钮时，触发文件输入元素
+        $("#file-input").click();
+    });
+
+    $("#file-input").change(function() {
+        // 用户选择了一个文件，发送文件到服务器
+        var file = this.files[0];  // 获取用户选择的文件
+        var formData = new FormData();
+        formData.append('file', file);  // 将文件添加到表单数据中
+
+        $.ajax({
+            url: "/api/upload_chunks/" + window.filename,
+            type: 'POST',
+            data: formData,
+            processData: false,  // 告诉 jQuery 不要处理发送的数据
+            contentType: false,  // 告诉 jQuery 不要设置 contentType
+            success: function(data) {
+                $("#chunks").empty();  // 清空原有的 chunks
+                for (var i = 0; i < data.chunks.length; i++) {
+                    $("#chunks").append("<div>" + data.chunks[i] + "</div>");
+                }
+                // 更新 total_usage
+                $(".small-font").text("Total Usage: " + data.total_usage);
+            }
+        });
+    });
+
+    </script>
+    <script>
+        var source = new EventSource("/progress");
+        source.onmessage = function(event) {
+            document.getElementById("progress-bar").value = event.data;
+        };
+    </script>
+    <script>
+    $("#stop-task").click(function() {
+        $.post("/api/stop_task", function(data) {
+            console.log('Stop task request sent');
+        });
+    });
+    </script>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+      $(document).ready(function() {
+        $('#theme-selector').change(function() {
+          $.post('/change_theme', {theme: $(this).val()});
+        });
+      });
+    </script>
+
+
+</body>
+</html>
